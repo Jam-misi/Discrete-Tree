@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TREE</title>
+  <style>
+
+    body { font-family: sans-serif; text-align: center; background-image: url("images/treetrunk.jpg"); }
+    canvas { background: #130e08; border: 10px solid #000000; margin-top: 10px; }
+    #controls { margin: 10px; }
+    input, select, button { margin: 5px; padding: 6px 12px; font-size: 14px; }
+    #message { margin-top: 10px; font-weight: bold; color: #ffffff; }
+  </style>
+</head>
+<body>
+  <h1>  <img src="/images/TREE.png">
+  </h1>
+  <div id="controls">
+    <input type="text" id="nodeValue" placeholder="Node Value" />
+    <button onclick="insertNode()">Add Node</button>
+    <br>
+    <input type="text" id="parentValue" placeholder="Parent Value" />
+    <input type="text" id="childValue" placeholder="Child Value" />
+    <select id="childPosition">
+      <option value="left">Left</option>
+      <option value="right">Right</option>
+    </select>
+    <button onclick="addChild()">Add Child</button>
+    <br>
+    <button onclick="deleteNode()">Delete Node</button>
+    <button onclick="searchNode()">Search</button>
+    <button onclick="traverseTree('pre')">Pre-order</button>
+    <button onclick="traverseTree('post')">Post-order</button>
+    <button onclick="traverseTree('in')">In-order</button>
+    <button onclick="toggleCollapse()">Toggle Collapse</button>
+  </div>
+  <p id="message"></p>
+  <canvas id="treeCanvas" width="900" height="500"></canvas>
+
+  <script>
+    class TreeNode {
+      constructor(value) {
+        this.value = value;
+        this.left = null;
+        this.right = null;
+        this.x = 0;
+        this.y = 0;
+      }
+    }
+
+    class CustomTree {
+      constructor() {
+        this.root = null;
+        this.canvas = document.getElementById('treeCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.verticalSpacing = 60;
+        this.collapse = false;
+      }
+
+      insertNode(value) {
+        const newNode = new TreeNode(value);
+        if (!this.root) {
+          this.root = newNode;
+        } else {
+          const queue = [this.root];
+          while (queue.length) {
+            const node = queue.shift();
+            if (!node.left) {
+              node.left = newNode;
+              break;
+            } else {
+              queue.push(node.left);
+            }
+
+            if (!node.right) {
+              node.right = newNode;
+              break;
+            } else {
+              queue.push(node.right);
+            }
+          }
+        }
+        this.drawTree();
+      }
+
+      findNode(node, value) {
+        if (!node) return null;
+        if (node.value == value) return node;
+        return this.findNode(node.left, value) || this.findNode(node.right, value);
+      }
+
+      addChild(parentVal, childVal, side) {
+        const parent = this.findNode(this.root, parentVal);
+        if (!parent) return false;
+
+        if (side === 'left') {
+          if (!parent.left) parent.left = new TreeNode(childVal);
+          else return false;
+        } else {
+          if (!parent.right) parent.right = new TreeNode(childVal);
+          else return false;
+        }
+
+        this.drawTree();
+        return true;
+      }
+
+      delete(value) {
+        this.root = this._deleteRec(this.root, value);
+        this.drawTree();
+      }
+
+      _deleteRec(node, value) {
+        if (!node) return null;
+        if (node.value == value) return null;
+        node.left = this._deleteRec(node.left, value);
+        node.right = this._deleteRec(node.right, value);
+        return node;
+      }
+
+      search(value) {
+        return this.findNode(this.root, value);
+      }
+
+      traverse(order) {
+        const result = [];
+        if (order === 'pre') this._preOrder(this.root, result);
+        else if (order === 'post') this._postOrder(this.root, result);
+        else if (order === 'in') this._inOrder(this.root, result);
+        return result;
+      }
+
+      _preOrder(node, result) {
+        if (node) {
+          result.push(node.value);
+          this._preOrder(node.left, result);
+          this._preOrder(node.right, result);
+        }
+      }
+
+      _postOrder(node, result) {
+        if (node) {
+          this._postOrder(node.left, result);
+          this._postOrder(node.right, result);
+          result.push(node.value);
+        }
+      }
+
+      _inOrder(node, result) {
+        if (node) {
+          this._inOrder(node.left, result);
+          result.push(node.value);
+          this._inOrder(node.right, result);
+        }
+      }
+
+      toggleCollapse() {
+        this.collapse = !this.collapse;
+        this.drawTree();
+      }
+
+      drawTree() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.root) {
+          this._calculatePositions(this.root, this.canvas.width / 2, 40, this.canvas.width / 4);
+          this._drawAnimated(this.root);
+        }
+      }
+
+      _calculatePositions(node, x, y, spacing) {
+        node.x = x;
+        node.y = y;
+        if (node.left) this._calculatePositions(node.left, x - spacing, y + this.verticalSpacing, spacing / 2);
+        if (node.right) this._calculatePositions(node.right, x + spacing, y + this.verticalSpacing, spacing / 2);
+      }
+
+      _drawAnimated(node) {
+        const queue = [{ node }];
+        let index = 0;
+        const step = () => {
+          if (index >= queue.length) return;
+          const { node } = queue[index];
+          this._drawConnection(node);
+          this._drawNode(node);
+          if (!this.collapse) {
+            if (node.left) queue.push({ node: node.left });
+            if (node.right) queue.push({ node: node.right });
+          }
+          index++;
+          setTimeout(step, 150);
+        };
+        step();
+      }
+
+      _drawConnection(node) {
+        this.ctx.strokeStyle = "#999";
+        if (node.left) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(node.x, node.y);
+          this.ctx.lineTo(node.left.x, node.left.y);
+          this.ctx.stroke();
+        }
+        if (node.right) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(node.x, node.y);
+          this.ctx.lineTo(node.right.x, node.right.y);
+          this.ctx.stroke();
+        }
+      }
+
+      _drawNode(node) {
+        const padding = 10;
+        const fontSize = 14;
+        this.ctx.font = `${fontSize}px sans-serif`;
+        const textWidth = this.ctx.measureText(node.value).width;
+        const boxWidth = textWidth + padding * 2;
+        const boxHeight = fontSize + padding * 2;
+
+        const x = node.x - boxWidth / 2;
+        const y = node.y - boxHeight / 2;
+        const radius = 10;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + radius, y);
+        this.ctx.lineTo(x + boxWidth - radius, y);
+        this.ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + radius);
+        this.ctx.lineTo(x + boxWidth, y + boxHeight - radius);
+        this.ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - radius, y + boxHeight);
+        this.ctx.lineTo(x + radius, y + boxHeight);
+        this.ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - radius);
+        this.ctx.lineTo(x, y + radius);
+        this.ctx.quadraticCurveTo(x, y, x + radius, y);
+        this.ctx.closePath();
+
+        this.ctx.fillStyle = "#7DDA58";
+        this.ctx.fill();
+        this.ctx.strokeStyle = "#333";
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = "#000";
+        this.ctx.textAlign = "center";
+        this.ctx.textBaseline = "middle";
+        this.ctx.fillText(node.value, node.x, node.y);
+      }
+    }
+
+    const tree = new CustomTree();
+    let selectedNode = null;
+
+    tree.canvas.addEventListener('click', function (e) {
+      const rect = tree.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      selectedNode = findClickedNode(tree.root, x, y);
+
+      if (selectedNode) {
+        document.getElementById('message').textContent = `✅ Selected node: ${selectedNode.value}`;
+      } else {
+        document.getElementById('message').textContent = `❌ No node selected`;
+      }
+    });
+
+    function findClickedNode(node, x, y) {
+      if (!node) return null;
+
+      const padding = 10;
+      const fontSize = 14;
+      tree.ctx.font = `${fontSize}px sans-serif`;
+      const textWidth = tree.ctx.measureText(node.value).width;
+      const boxWidth = textWidth + padding * 2;
+      const boxHeight = fontSize + padding * 2;
+
+      const x0 = node.x - boxWidth / 2;
+      const y0 = node.y - boxHeight / 2;
+      const x1 = x0 + boxWidth;
+      const y1 = y0 + boxHeight;
+
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return node;
+
+      return findClickedNode(node.left, x, y) || findClickedNode(node.right, x, y);
+    }
+
+    function insertNode() {
+      const val = document.getElementById('nodeValue').value.trim();
+      if (val !== '') {
+        tree.insertNode(val);
+        document.getElementById('message').textContent = `🌱 Node '${val}' added`;
+      }
+    }
+
+    function addChild() {
+      const parentInput = document.getElementById('parentValue').value.trim();
+      const childVal = document.getElementById('childValue').value.trim();
+      const side = document.getElementById('childPosition').value;
+
+      const parentVal = parentInput !== '' ? parentInput : (selectedNode ? selectedNode.value : null);
+
+      if (parentVal && childVal !== '') {
+        const success = tree.addChild(parentVal, childVal, side);
+        document.getElementById('message').textContent = success
+          ? `🔗 ${side} child '${childVal}' added to '${parentVal}'`
+          : `❌ Could not add (already filled?)`;
+      } else {
+        document.getElementById('message').textContent = `⚠️ Please select a node or enter parent value`;
+      }
+    }
+
+    function deleteNode() {
+      const value = document.getElementById('nodeValue').value.trim();
+      if (value !== '') {
+        tree.delete(value);
+        document.getElementById('message').textContent = `🗑️ Deleted '${value}'`;
+      }
+    }
+
+    function searchNode() {
+      const value = document.getElementById('nodeValue').value.trim();
+      const found = tree.search(value);
+      document.getElementById('message').textContent = found
+        ? `🔍 Found '${value}'`
+        : `❌ '${value}' not found`;
+    }
+
+    function traverseTree(order) {
+      const result = tree.traverse(order);
+      const label = order === 'pre' ? "Pre-order" : order === 'post' ? "Post-order" : "In-order";
+      document.getElementById('message').textContent = `📋 ${label}: ${result.join(', ')}`;
+    }
+
+    function toggleCollapse() {
+      tree.toggleCollapse();
+    }
+  </script>
+</body>
+</html>
